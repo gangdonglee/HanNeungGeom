@@ -176,6 +176,7 @@
           <button id="shuffleBtn" class="icon-btn" title="셔플">🔀</button>
           <button id="wrongBtn" class="icon-btn" title="오답노트">★ 오답</button>
           <button id="resetBtn" class="icon-btn" title="푼 기록 초기화">🔄 초기화</button>
+          <select id="roundSelect" class="unit-select"></select>
           <select id="unitSelect" class="unit-select"></select>
         </div>
       </div>
@@ -212,6 +213,7 @@
     // ============================ 상태 ============================
     let mode = 'quiz';          // 'quiz' | 'wrong' | 'result'
     let unitCode = 'all';
+    let roundCode = 'all';      // 'all' 또는 회차 번호
     let shuffled = false;
     let pool = [];              // 현재 풀이 대상 문제 배열 (순서 적용됨)
     let idx = 0;
@@ -221,6 +223,7 @@
     const $content = document.getElementById('content');
     const $footer = document.getElementById('footer');
     const $unitSelect = document.getElementById('unitSelect');
+    const $roundSelect = document.getElementById('roundSelect');
     const $actionBtn = document.getElementById('actionBtn');
     const $prevBtn = document.getElementById('prevBtn');
     const $shuffleBtn = document.getElementById('shuffleBtn');
@@ -235,6 +238,19 @@
       $unitSelect.appendChild(opt);
     });
     function unitName(code) { const u = units.find(u => u.code === code); return u ? u.name : code; }
+
+    // 회차 셀렉트 (데이터에 있는 회차들, 내림차순)
+    const allRounds = [...new Set(questions.map(q => q.round).filter(r => r))].sort((a, b) => b - a);
+    {
+      const optAll = document.createElement('option');
+      optAll.value = 'all'; optAll.textContent = '전체 회차';
+      $roundSelect.appendChild(optAll);
+      allRounds.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = String(r); opt.textContent = `${r}회`;
+        $roundSelect.appendChild(opt);
+      });
+    }
 
     // 시드 셔플 (Fisher–Yates)
     function shuffle(arr) {
@@ -252,18 +268,26 @@
       if (mode === 'wrong') {
         base = questions.filter(q => store.answers[q.id] && !store.answers[q.id].correct);
       } else {
-        base = unitCode === 'all' ? [...questions] : questions.filter(q => q.unit === unitCode);
+        base = [...questions];
+        if (roundCode !== 'all') base = base.filter(q => String(q.round) === String(roundCode));
+        if (unitCode !== 'all') base = base.filter(q => q.unit === unitCode);
       }
-      pool = shuffled ? shuffle(base) : base;
+      if (shuffled) {
+        base = shuffle(base);
+      } else if (roundCode !== 'all') {
+        base = [...base].sort((a, b) => a.number - b.number);   // 회차 보기는 번호순
+      }
+      pool = base;
     }
 
     function restoreOrStart() {
       // 마지막 위치 복원
       const last = store.last;
       if (last && last.mode) {
-        mode = last.mode; unitCode = last.unit || 'all'; shuffled = !!last.shuffled;
+        mode = last.mode; unitCode = last.unit || 'all'; roundCode = last.round || 'all'; shuffled = !!last.shuffled;
       }
       $unitSelect.value = unitCode;
+      $roundSelect.value = roundCode;
       $shuffleBtn.classList.toggle('active', shuffled);
       $wrongBtn.classList.toggle('active', mode === 'wrong');
       buildPool();
@@ -282,7 +306,7 @@
     }
 
     function persistLast() {
-      store.last = { mode, unit: unitCode, shuffled, idx };
+      store.last = { mode, unit: unitCode, round: roundCode, shuffled, idx };
       saveStore();
     }
 
@@ -773,6 +797,12 @@
     $unitSelect.addEventListener('change', e => {
       if (!guardExam()) { $unitSelect.value = unitCode; return; }
       unitCode = e.target.value;
+      if (mode !== 'quiz') { mode = 'quiz'; $wrongBtn.classList.remove('active'); }
+      buildPool(); idx = 0; loadQuestion();
+    });
+    $roundSelect.addEventListener('change', e => {
+      if (!guardExam()) { $roundSelect.value = roundCode; return; }
+      roundCode = e.target.value;
       if (mode !== 'quiz') { mode = 'quiz'; $wrongBtn.classList.remove('active'); }
       buildPool(); idx = 0; loadQuestion();
     });
