@@ -76,7 +76,17 @@
       background: var(--source-bg); border: 1px solid var(--line); border-left: 3px solid var(--brand);
       border-radius: 8px; padding: 12px 14px; font-size: 14px; font-weight: 400; color: #374151; margin-top: 10px;
     }
-    .q-image { width: 100%; border-radius: 8px; margin: 12px 0; border: 1px solid var(--line); }
+    .q-image { max-width: 100%; height: auto; border-radius: 8px; margin: 12px 0; border: 1px solid var(--line); cursor: zoom-in; }
+    /* 이미지 확대 보기 (탭하면 큰 화면에서 스크롤하며 보기) */
+    #imgOverlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.92); display: none; overflow: auto; -webkit-overflow-scrolling: touch; }
+    #imgOverlay.show { display: block; }
+    #imgOverlay img { display: block; margin: 16px auto; max-width: none; cursor: zoom-out; }
+    #imgOverlay .ov-close {
+      position: fixed; top: 10px; right: 12px; z-index: 201; color: #fff; font-size: 22px;
+      background: rgba(0,0,0,.55); width: 40px; height: 40px; border-radius: 50%; border: none;
+      line-height: 40px; text-align: center; cursor: pointer;
+    }
+    #imgOverlay .ov-hint { position: fixed; bottom: 14px; left: 0; right: 0; text-align: center; color: #ccc; font-size: 12px; }
 
     /* 보기 */
     .choices { list-style: none; padding: 0; margin: 6px 0 0; }
@@ -193,6 +203,12 @@
       <button id="actionBtn" class="btn btn-primary">정답 확인</button>
       <button id="examSubmitBtn" class="btn btn-danger" style="display:none">제출</button>
     </footer>
+  </div>
+
+  <div id="imgOverlay">
+    <button class="ov-close" aria-label="닫기">×</button>
+    <img id="ovImg" src="" alt="자료 확대" />
+    <div class="ov-hint">이미지를 상하좌우로 밀어 보세요 · 탭하면 닫힘</div>
   </div>
 
   <script src="questions.js"></script>
@@ -829,6 +845,17 @@
       $wrongBtn.classList.remove('active');
       buildPool(); idx = 0; loadQuestion();
     });
+
+    // ============================ 이미지 확대 보기 ============================
+    const $imgOverlay = document.getElementById('imgOverlay');
+    const $ovImg = document.getElementById('ovImg');
+    function openOverlay(src) { $ovImg.src = src; $imgOverlay.classList.add('show'); }
+    function closeOverlay() { $imgOverlay.classList.remove('show'); $ovImg.src = ''; }
+    $content.addEventListener('click', e => {
+      const img = e.target.closest('.q-image');
+      if (img && img.getAttribute('src')) openOverlay(img.getAttribute('src'));
+    });
+    $imgOverlay.addEventListener('click', closeOverlay);
 
     // ============================ 시작 ============================
     if (store.exam && store.exam.active) {
