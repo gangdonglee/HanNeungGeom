@@ -1,0 +1,5 @@
+# 작업용 임시 파일 (PDF 원본, 렌더링 PNG 등)
+*.pdf
+*.png
+work/
+test_*
