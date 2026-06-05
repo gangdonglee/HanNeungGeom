@@ -3,3 +3,7 @@
 *.png
 work/
 test_*
+
+# 단, 문제에 쓰는 이미지(images/)는 커밋
+!images/
+!images/*.png
