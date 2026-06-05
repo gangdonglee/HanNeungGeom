@@ -427,6 +427,50 @@
     // ============================ 실전 모의고사 ============================
     const qById = {};
     questions.forEach(q => { qById[q.id] = q; });
+
+    // 실제 한능검 심화 50문항 기준 시대별 출제 분포
+    const EXAM_DIST = [
+      { units: ['prehistoric', 'gojoseon'], n50: 3 },   // 선사·고조선·여러 나라
+      { units: ['ancient', 'north_south'], n50: 8 },     // 고대(삼국·남북국)
+      { units: ['goryeo'], n50: 8 },                     // 고려
+      { units: ['joseon'], n50: 11 },                    // 조선
+      { units: ['modern'], n50: 7 },                     // 근대
+      { units: ['colonial'], n50: 7 },                   // 일제 강점기
+      { units: ['contemporary'], n50: 5 },               // 현대
+      { units: ['culture'], n50: 1 },                    // 통합·문화
+    ];
+    const UNIT_ORDER = ['prehistoric','gojoseon','ancient','north_south','goryeo',
+                        'joseon','modern','colonial','contemporary','culture'];
+    const unitRank = {};
+    UNIT_ORDER.forEach((u, i) => { unitRank[u] = i; });
+
+    // 실전 분포대로 n문항을 뽑아 시대순으로 정렬
+    function buildExamIds(n) {
+      let targets = EXAM_DIST.map(g => Math.max(0, Math.round(g.n50 * n / 50)));
+      let diff = n - targets.reduce((a, b) => a + b, 0);
+      const big = targets.map((t, i) => i).sort((a, b) => targets[b] - targets[a]);
+      let k = 0;
+      while (diff !== 0) {                 // 반올림 오차를 큰 그룹부터 보정
+        const i = big[k % big.length];
+        if (diff > 0) { targets[i]++; diff--; }
+        else if (targets[i] > 0) { targets[i]--; diff++; }
+        k++;
+      }
+      const picked = [];
+      let shortage = 0;
+      EXAM_DIST.forEach((g, i) => {
+        const groupPool = shuffle(questions.filter(q => g.units.includes(q.unit)).map(q => q.id));
+        const take = Math.min(targets[i], groupPool.length);
+        picked.push(...groupPool.slice(0, take));
+        shortage += targets[i] - take;     // 가용 문항이 모자라면 누적
+      });
+      if (shortage > 0) {                  // 모자란 만큼 나머지 전체에서 보충
+        const rest = shuffle(questions.map(q => q.id).filter(id => !picked.includes(id)));
+        picked.push(...rest.slice(0, shortage));
+      }
+      return picked.sort((a, b) => unitRank[qById[a].unit] - unitRank[qById[b].unit]);
+    }
+
     let examActive = false;       // 모의고사 응시/결과 화면 표시 중
     let exam = null;              // { active, ids, answers:{id:sel}, idx, endTime, durationMin, submitted }
     let examTimer = null;
@@ -471,7 +515,8 @@
             <button class="btn btn-ghost" id="examCancel" style="flex:none">취소</button>
           </div>
           <p class="exam-sub" style="margin-top:18px;line-height:1.7">
-            전체 ${questions.length}문항 중 무작위로 출제됩니다.<br>
+            실제 한능검과 동일한 <b>시대별 분포</b>로 출제되고
+            <b>1번 선사 → 마지막 현대</b> 순으로 정렬됩니다.<br>
             시험 중에는 정답·해설이 보이지 않고, <b>제출 후 채점·예상 등급·해설</b>을
             확인할 수 있어요.<br>창을 닫아도 남은 시간은 계속 흐릅니다.
           </p>
@@ -482,7 +527,7 @@
     }
 
     function startExam(n, minutes) {
-      const ids = shuffle(questions.map(q => q.id)).slice(0, Math.min(n, questions.length));
+      const ids = buildExamIds(Math.min(n, questions.length));
       exam = { active: true, ids, answers: {}, idx: 0,
                endTime: Date.now() + minutes * 60000, durationMin: minutes, submitted: false };
       examActive = true;
