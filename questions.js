@@ -962,10 +962,10 @@ const questions = [
     id: "74-5", round: 74, number: 5, unit: "ancient", level: "심화", points: 2,
     prompt: `(가) 국가에 대한 설명으로 옳은 것은?
       <div class="source">
-        능산리 고분군 동하총의 사신도 벽화와 송산리 6호분은 <b>(가)</b> 의
-        고분 벽화 연구에 중요한 자료이다.
+        능산리 고분군 동하총의 사신도·연꽃무늬 벽화로, <b>(가)</b> 의 고분
+        벽화 연구에 중요한 자료이다.
       </div>`,
-    image: null,
+    image: "images/74-5.png",
     choices: [
       "일길찬, 사찬 등의 관등이 있었다.",
       "지방 장관으로 욕살, 처려근지 등이 있었다.",
