@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>한능검 문제풀이</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --card: #ffffff;
+      --ink: #1f2328;
+      --sub: #6b7280;
+      --line: #e5e7eb;
+      --brand: #2563eb;
+      --brand-soft: #eff6ff;
+      --correct: #16a34a;
+      --correct-soft: #f0fdf4;
+      --wrong: #dc2626;
+      --wrong-soft: #fef2f2;
+      --source-bg: #f9fafb;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+        "Malgun Gothic", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-text-size-adjust: 100%;
+    }
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      position: relative;
+    }
+
+    /* 상단 바 */
+    .topbar {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      padding: 12px 16px 10px;
+    }
+    .topbar-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .topbar h1 { font-size: 16px; margin: 0; font-weight: 700; cursor: pointer; }
+    .topbar-actions { display: flex; gap: 6px; align-items: center; }
+    .icon-btn {
+      border: 1px solid var(--line); background: var(--card); color: var(--sub);
+      border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .icon-btn.active { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+    .unit-select {
+      font-size: 13px; border: 1px solid var(--line); border-radius: 8px;
+      padding: 6px 8px; background: var(--card); color: var(--ink);
+    }
+    .progress-wrap { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+    .progress-bar { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; width: 0%; background: var(--brand); transition: width .25s ease; }
+    .progress-text { font-size: 12px; color: var(--sub); white-space: nowrap; }
+
+    /* 본문 */
+    .content { flex: 1; padding: 16px; overflow-y: auto; }
+    .meta-row { display: flex; gap: 6px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+    .tag { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 99px; background: var(--brand-soft); color: var(--brand); }
+    .tag.gray { background: #f3f4f6; color: var(--sub); }
+    .tag.warn { background: #fffbeb; color: #b45309; }
+
+    .prompt { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
+    .source {
+      background: var(--source-bg); border: 1px solid var(--line); border-left: 3px solid var(--brand);
+      border-radius: 8px; padding: 12px 14px; font-size: 14px; font-weight: 400; color: #374151; margin-top: 10px;
+    }
+    .q-image { width: 100%; border-radius: 8px; margin: 12px 0; border: 1px solid var(--line); }
+
+    /* 보기 */
+    .choices { list-style: none; padding: 0; margin: 6px 0 0; }
+    .choice {
+      display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
+      background: var(--card); border: 1.5px solid var(--line); border-radius: 12px;
+      padding: 13px 14px; margin-bottom: 10px; font-size: 15px; color: var(--ink); cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .choice:active { background: #f9fafb; }
+    .choice .num {
+      flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line);
+      display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--sub); margin-top: 1px;
+    }
+    .choice.selected { border-color: var(--brand); background: var(--brand-soft); }
+    .choice.selected .num { border-color: var(--brand); color: var(--brand); }
+    .choice.correct { border-color: var(--correct); background: var(--correct-soft); }
+    .choice.correct .num { border-color: var(--correct); background: var(--correct); color: #fff; }
+    .choice.wrong { border-color: var(--wrong); background: var(--wrong-soft); }
+    .choice.wrong .num { border-color: var(--wrong); background: var(--wrong); color: #fff; }
+    .choice.locked { cursor: default; }
+
+    /* 해설 */
+    .explanation { margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; animation: slideIn .2s ease; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .explanation-head { padding: 10px 14px; font-size: 13px; font-weight: 700; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+    .explanation-head.ok { background: var(--correct); }
+    .explanation-head.no { background: var(--wrong); }
+    .explanation-body { padding: 14px; font-size: 14px; color: #374151; background: var(--card); }
+    .bookmark-btn { background: rgba(255,255,255,.2); border: none; color: #fff; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+
+    /* 하단 버튼 */
+    .footer {
+      position: sticky; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: var(--card); border-top: 1px solid var(--line); display: flex; gap: 10px;
+    }
+    .btn { flex: 1; border: none; border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity .15s, background .15s; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-ghost { background: #f3f4f6; color: var(--ink); flex: 0 0 auto; padding-left: 20px; padding-right: 20px; }
+
+    .empty { text-align: center; color: var(--sub); padding: 60px 20px; font-size: 14px; }
+
+    /* 결과 화면 */
+    .result { padding: 30px 20px; text-align: center; }
+    .result .score-circle {
+      width: 140px; height: 140px; margin: 10px auto 20px; border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border: 8px solid var(--brand-soft);
+    }
+    .result .score-num { font-size: 40px; font-weight: 800; color: var(--brand); line-height: 1; }
+    .result .score-total { font-size: 14px; color: var(--sub); margin-top: 4px; }
+    .result h2 { font-size: 20px; margin: 0 0 6px; }
+    .result .grade { font-size: 15px; color: var(--sub); margin-bottom: 24px; }
+    .result-stats { display: flex; gap: 10px; margin-bottom: 24px; }
+    .result-stats .stat { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 8px; }
+    .result-stats .stat .v { font-size: 22px; font-weight: 800; }
+    .result-stats .stat .v.ok { color: var(--correct); }
+    .result-stats .stat .v.no { color: var(--wrong); }
+    .result-stats .stat .l { font-size: 12px; color: var(--sub); margin-top: 2px; }
+    .result-actions { display: flex; flex-direction: column; gap: 10px; }
+    .result-actions .btn { flex: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-row">
+        <h1 id="homeBtn">한능검 문제풀이</h1>
+        <div class="topbar-actions">
+          <button id="shuffleBtn" class="icon-btn" title="셔플">🔀 셔플</button>
+          <button id="wrongBtn" class="icon-btn" title="오답노트">★ 오답</button>
+          <select id="unitSelect" class="unit-select"></select>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <span id="progressText" class="progress-text">0 / 0</span>
+      </div>
+    </header>
+
+    <main id="content" class="content"></main>
+
+    <footer id="footer" class="footer">
+      <button id="prevBtn" class="btn btn-ghost">이전</button>
+      <button id="actionBtn" class="btn btn-primary">정답 확인</button>
+    </footer>
+  </div>
+
+  <script src="questions.js"></script>
+  <script>
+    // ============================ 저장소 (localStorage) ============================
+    const STORE_KEY = 'hanneung_v1';
+    function loadStore() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
+      catch { return {}; }
+    }
+    function saveStore() { localStorage.setItem(STORE_KEY, JSON.stringify(store)); }
+    // store = { answers: {id:{selected,correct}}, bookmarks: {id:true}, last: {unit,idx,mode,order} }
+    const store = loadStore();
+    store.answers = store.answers || {};
+    store.bookmarks = store.bookmarks || {};
+    store.last = store.last || {};
+
+    // ============================ 상태 ============================
+    let mode = 'quiz';          // 'quiz' | 'wrong' | 'result'
+    let unitCode = 'all';
+    let shuffled = false;
+    let pool = [];              // 현재 풀이 대상 문제 배열 (순서 적용됨)
+    let idx = 0;
+    let selected = null;
+    let checked = false;
+
+    const $content = document.getElementById('content');
+    const $footer = document.getElementById('footer');
+    const $unitSelect = document.getElementById('unitSelect');
+    const $actionBtn = document.getElementById('actionBtn');
+    const $prevBtn = document.getElementById('prevBtn');
+    const $shuffleBtn = document.getElementById('shuffleBtn');
+    const $wrongBtn = document.getElementById('wrongBtn');
+    const $progressFill = document.getElementById('progressFill');
+    const $progressText = document.getElementById('progressText');
+
+    // 단원 셀렉트
+    units.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.code; opt.textContent = u.name;
+      $unitSelect.appendChild(opt);
+    });
+    function unitName(code) { const u = units.find(u => u.code === code); return u ? u.name : code; }
+
+    // 시드 셔플 (Fisher–Yates)
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    // 현재 모드/필터에 맞는 pool 구성
+    function buildPool() {
+      let base;
+      if (mode === 'wrong') {
+        base = questions.filter(q => store.answers[q.id] && !store.answers[q.id].correct);
+      } else {
+        base = unitCode === 'all' ? [...questions] : questions.filter(q => q.unit === unitCode);
+      }
+      pool = shuffled ? shuffle(base) : base;
+    }
+
+    function restoreOrStart() {
+      // 마지막 위치 복원
+      const last = store.last;
+      if (last && last.mode) {
+        mode = last.mode; unitCode = last.unit || 'all'; shuffled = !!last.shuffled;
+      }
+      $unitSelect.value = unitCode;
+      $shuffleBtn.classList.toggle('active', shuffled);
+      $wrongBtn.classList.toggle('active', mode === 'wrong');
+      buildPool();
+      idx = Math.min(last.idx || 0, Math.max(0, pool.length - 1));
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      const q = pool[idx];
+      if (q && store.answers[q.id]) {
+        selected = store.answers[q.id].selected;
+        checked = true;
+      } else { selected = null; checked = false; }
+      persistLast();
+      render();
+    }
+
+    function persistLast() {
+      store.last = { mode, unit: unitCode, shuffled, idx };
+      saveStore();
+    }
+
+    // ============================ 렌더 ============================
+    function render() {
+      $footer.style.display = 'flex';
+
+      if (mode === 'result') return renderResult();
+
+      if (pool.length === 0) {
+        const msg = mode === 'wrong' ? '아직 틀린 문제가 없어요. 👍' : '이 단원에는 등록된 문제가 없어요.';
+        $content.innerHTML = `<div class="empty">${msg}</div>`;
+        $progressText.textContent = '0 / 0';
+        $progressFill.style.width = '0%';
+        $actionBtn.disabled = true; $prevBtn.disabled = true;
+        return;
+      }
+
+      const q = pool[idx];
+      $progressText.textContent = `${idx + 1} / ${pool.length}`;
+      $progressFill.style.width = `${((idx + 1) / pool.length) * 100}%`;
+
+      const roundLabel = q.round ? `${q.round}회 ${q.number}번` : `예시 ${q.number}`;
+      const bookmarked = !!store.bookmarks[q.id];
+      let html = `
+        <div class="meta-row">
+          <span class="tag">${unitName(q.unit)}</span>
+          <span class="tag gray">${q.level} · ${q.points}점</span>
+          <span class="tag gray">${roundLabel}</span>
+          ${q.needsImage ? '<span class="tag warn">⚠ 이미지 필요</span>' : ''}
+        </div>
+        <p class="prompt">${q.prompt}</p>
+        ${q.image ? `<img class="q-image" src="${q.image}" alt="문제 이미지" />` : ''}
+        <ul class="choices">
+      `;
+      q.choices.forEach((c, i) => {
+        let cls = 'choice';
+        if (checked) {
+          cls += ' locked';
+          if (i === q.answer) cls += ' correct';
+          else if (i === selected) cls += ' wrong';
+        } else if (i === selected) cls += ' selected';
+        const numChar = '①②③④⑤'[i] || (i + 1);
+        html += `<li><button class="${cls}" data-i="${i}" ${checked ? 'disabled' : ''}>
+            <span class="num">${numChar}</span><span>${c}</span></button></li>`;
+      });
+      html += '</ul>';
+
+      if (checked) {
+        const isOk = selected === q.answer;
+        html += `
+          <div class="explanation">
+            <div class="explanation-head ${isOk ? 'ok' : 'no'}">
+              <span>${isOk ? '✓ 정답입니다' : '✕ 오답 — 정답: ' + '①②③④⑤'[q.answer]}</span>
+              <button class="bookmark-btn" id="bmBtn">${bookmarked ? '★ 저장됨' : '☆ 북마크'}</button>
+            </div>
+            <div class="explanation-body">${q.explanation || '해설이 아직 없습니다.'}</div>
+          </div>`;
+      }
+
+      $content.innerHTML = html;
+      $content.scrollTop = 0;
+
+      $content.querySelectorAll('.choice').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (checked) return;
+          selected = Number(btn.dataset.i);
+          render();
+        });
+      });
+      const bm = document.getElementById('bmBtn');
+      if (bm) bm.addEventListener('click', () => {
+        if (store.bookmarks[q.id]) delete store.bookmarks[q.id];
+        else store.bookmarks[q.id] = true;
+        saveStore(); render();
+      });
+
+      updateButtons();
+    }
+
+    function updateButtons() {
+      $prevBtn.disabled = idx === 0;
+      if (!checked) {
+        $actionBtn.textContent = '정답 확인';
+        $actionBtn.disabled = selected === null;
+      } else {
+        $actionBtn.textContent = idx === pool.length - 1 ? '결과 보기' : '다음 문제';
+        $actionBtn.disabled = false;
+      }
+    }
+
+    // ============================ 결과 화면 ============================
+    function renderResult() {
+      $footer.style.display = 'none';
+      const answered = pool.filter(q => store.answers[q.id]);
+      const correct = answered.filter(q => store.answers[q.id].correct).length;
+      const total = pool.length;
+      const wrong = answered.length - correct;
+      const pct = total ? Math.round((correct / total) * 100) : 0;
+      let grade = '조금 더!';
+      if (pct >= 90) grade = '🏆 완벽해요!';
+      else if (pct >= 70) grade = '👍 합격권이에요!';
+      else if (pct >= 50) grade = '💪 거의 다 왔어요';
+
+      $content.innerHTML = `
+        <div class="result">
+          <h2>풀이 완료</h2>
+          <div class="grade">${grade}</div>
+          <div class="score-circle">
+            <div class="score-num">${pct}<span style="font-size:18px">점</span></div>
+            <div class="score-total">${correct} / ${total}</div>
+          </div>
+          <div class="result-stats">
+            <div class="stat"><div class="v ok">${correct}</div><div class="l">맞음</div></div>
+            <div class="stat"><div class="v no">${wrong}</div><div class="l">틀림</div></div>
+            <div class="stat"><div class="v">${total - answered.length}</div><div class="l">안 풂</div></div>
+          </div>
+          <div class="result-actions">
+            <button class="btn btn-primary" id="reviewWrongBtn">틀린 문제 다시 풀기</button>
+            <button class="btn btn-ghost" id="retryBtn" style="flex:none">처음부터 다시</button>
+          </div>
+        </div>`;
+      $progressFill.style.width = '100%';
+      $progressText.textContent = `${answered.length} / ${total}`;
+
+      document.getElementById('reviewWrongBtn').addEventListener('click', () => {
+        switchMode('wrong');
+      });
+      document.getElementById('retryBtn').addEventListener('click', () => {
+        // 현재 pool 문제들의 풀이 기록 초기화
+        pool.forEach(q => delete store.answers[q.id]);
+        saveStore();
+        mode = 'quiz'; buildPool(); idx = 0; loadQuestion();
+      });
+    }
+
+    function switchMode(m) {
+      mode = m;
+      $wrongBtn.classList.toggle('active', mode === 'wrong');
+      buildPool(); idx = 0; loadQuestion();
+    }
+
+    // ============================ 이벤트 ============================
+    $actionBtn.addEventListener('click', () => {
+      const q = pool[idx];
+      if (!checked) {
+        checked = true;
+        store.answers[q.id] = { selected, correct: selected === q.answer };
+        saveStore();
+        render();
+      } else {
+        if (idx === pool.length - 1) { mode = 'result'; render(); }
+        else { idx++; loadQuestion(); }
+      }
+    });
+    $prevBtn.addEventListener('click', () => { if (idx > 0) { idx--; loadQuestion(); } });
+
+    $unitSelect.addEventListener('change', e => {
+      unitCode = e.target.value;
+      if (mode !== 'quiz') { mode = 'quiz'; $wrongBtn.classList.remove('active'); }
+      buildPool(); idx = 0; loadQuestion();
+    });
+    $shuffleBtn.addEventListener('click', () => {
+      shuffled = !shuffled;
+      $shuffleBtn.classList.toggle('active', shuffled);
+      buildPool(); idx = 0; loadQuestion();
+    });
+    $wrongBtn.addEventListener('click', () => {
+      switchMode(mode === 'wrong' ? 'quiz' : 'wrong');
+    });
+    document.getElementById('homeBtn').addEventListener('click', () => {
+      mode = 'quiz'; buildPool(); idx = 0; loadQuestion();
+    });
+
+    // ============================ 시작 ============================
+    restoreOrStart();
+  </script>
+</body>
+</html>
