@@ -215,6 +215,7 @@
   <script>
     // ============================ 저장소 (localStorage) ============================
     const STORE_KEY = 'hanneung_v1';
+    const IMG_VER = '3';   // 자료 이미지 캐시 무력화 (이미지 바꿀 때마다 숫자 올림)
     function loadStore() {
       try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
       catch { return {}; }
@@ -355,7 +356,7 @@
           ${q.needsImage ? '<span class="tag warn">⚠ 이미지 필요</span>' : ''}
         </div>
         <p class="prompt">${q.prompt}</p>
-        ${q.image ? `<img class="q-image" src="${q.image}" alt="문제 이미지" />` : ''}
+        ${q.image ? `<img class="q-image" src="${q.image}?v=${IMG_VER}" alt="문제 이미지" />` : ''}
         <ul class="choices">
       `;
       q.choices.forEach((c, i) => {
@@ -627,7 +628,7 @@
           <span class="tag gray">${q.round}회 ${q.number}번</span>
         </div>
         <p class="prompt">${q.prompt}</p>
-        ${q.image ? `<img class="q-image" src="${q.image}" alt="문제 이미지" />` : ''}
+        ${q.image ? `<img class="q-image" src="${q.image}?v=${IMG_VER}" alt="문제 이미지" />` : ''}
         <ul class="choices">`;
       q.choices.forEach((c, i) => {
         const cls = 'choice' + (i === sel ? ' selected' : '');
@@ -728,7 +729,7 @@
             <span class="tag ${isOk ? '' : 'warn'}">${sel == null ? '미응답' : (isOk ? '정답' : '오답')}</span>
           </div>
           <p class="prompt">${q.prompt}</p>
-          ${q.image ? `<img class="q-image" src="${q.image}" />` : ''}
+          ${q.image ? `<img class="q-image" src="${q.image}?v=${IMG_VER}" />` : ''}
           <ul class="choices">`;
         q.choices.forEach((c, i) => {
           let cls = 'choice locked';
