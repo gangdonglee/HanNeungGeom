@@ -139,6 +139,31 @@
     .result-stats .stat .l { font-size: 12px; color: var(--sub); margin-top: 2px; }
     .result-actions { display: flex; flex-direction: column; gap: 10px; }
     .result-actions .btn { flex: none; }
+    .result .grade.big { font-size: 22px; font-weight: 800; color: var(--ink); }
+    .result .grade.pass { color: var(--correct); }
+    .result .grade.fail { color: var(--wrong); }
+
+    /* 실전 모의고사 */
+    .topbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+    .exam-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 10px 14px; margin-bottom: 12px;
+    }
+    .exam-timer { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--brand); }
+    .exam-timer.warn { color: var(--wrong); animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: .5; } }
+    .exam-sub { font-size: 12px; color: var(--sub); }
+    .omr { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin-bottom: 14px; }
+    .omr button {
+      font-size: 11px; padding: 6px 0; border: 1px solid var(--line); border-radius: 6px;
+      background: var(--card); color: var(--sub); cursor: pointer; font-weight: 600;
+    }
+    .omr button.done { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+    .omr button.cur { outline: 2px solid var(--brand); outline-offset: 1px; }
+    .btn-danger { background: var(--wrong); color: #fff; flex: 0 0 auto; padding-left: 18px; padding-right: 18px; }
+    .review-item { border-top: 8px solid var(--bg); padding-top: 16px; margin-top: 16px; }
+    .review-item:first-child { border-top: none; margin-top: 0; padding-top: 0; }
   </style>
 </head>
 <body>
@@ -147,7 +172,8 @@
       <div class="topbar-row">
         <h1 id="homeBtn">한능검 문제풀이</h1>
         <div class="topbar-actions">
-          <button id="shuffleBtn" class="icon-btn" title="셔플">🔀 셔플</button>
+          <button id="examBtn" class="icon-btn" title="실전 모의고사">📝 모의고사</button>
+          <button id="shuffleBtn" class="icon-btn" title="셔플">🔀</button>
           <button id="wrongBtn" class="icon-btn" title="오답노트">★ 오답</button>
           <select id="unitSelect" class="unit-select"></select>
         </div>
@@ -163,6 +189,7 @@
     <footer id="footer" class="footer">
       <button id="prevBtn" class="btn btn-ghost">이전</button>
       <button id="actionBtn" class="btn btn-primary">정답 확인</button>
+      <button id="examSubmitBtn" class="btn btn-danger" style="display:none">제출</button>
     </footer>
   </div>
 
@@ -397,8 +424,265 @@
       buildPool(); idx = 0; loadQuestion();
     }
 
+    // ============================ 실전 모의고사 ============================
+    const qById = {};
+    questions.forEach(q => { qById[q.id] = q; });
+    let examActive = false;       // 모의고사 응시/결과 화면 표시 중
+    let exam = null;              // { active, ids, answers:{id:sel}, idx, endTime, durationMin, submitted }
+    let examTimer = null;
+
+    const $examBtn = document.getElementById('examBtn');
+    const $examSubmitBtn = document.getElementById('examSubmitBtn');
+
+    function saveExam() { store.exam = exam; saveStore(); }
+    function stopTimer() { if (examTimer) { clearInterval(examTimer); examTimer = null; } }
+    function fmtTime(ms) {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }
+    function startTimer() {
+      stopTimer();
+      examTimer = setInterval(tick, 1000);
+      tick();
+    }
+    function tick() {
+      if (!exam || exam.submitted) { stopTimer(); return; }
+      const rem = exam.endTime - Date.now();
+      const el = document.getElementById('examTimer');
+      if (rem <= 0) { stopTimer(); submitExam(); return; }
+      if (el) { el.textContent = fmtTime(rem); el.classList.toggle('warn', rem <= 60000); }
+    }
+
+    // 모의고사 시작 화면
+    function openExamStart() {
+      examActive = false;
+      $footer.style.display = 'none';
+      $examSubmitBtn.style.display = 'none';
+      $progressText.textContent = '';
+      $progressFill.style.width = '0%';
+      $content.innerHTML = `
+        <div class="result">
+          <h2>📝 실전 모의고사</h2>
+          <div class="grade">실제 시험처럼 무작위 출제 + 제한시간</div>
+          <div class="result-actions">
+            <button class="btn btn-primary" data-n="50" data-m="80">50문항 · 80분 <span style="font-weight:400">(실전)</span></button>
+            <button class="btn btn-primary" data-n="30" data-m="50">30문항 · 50분</button>
+            <button class="btn btn-primary" data-n="20" data-m="30">20문항 · 30분</button>
+            <button class="btn btn-ghost" id="examCancel" style="flex:none">취소</button>
+          </div>
+          <p class="exam-sub" style="margin-top:18px;line-height:1.7">
+            전체 ${questions.length}문항 중 무작위로 출제됩니다.<br>
+            시험 중에는 정답·해설이 보이지 않고, <b>제출 후 채점·예상 등급·해설</b>을
+            확인할 수 있어요.<br>창을 닫아도 남은 시간은 계속 흐릅니다.
+          </p>
+        </div>`;
+      $content.querySelectorAll('[data-n]').forEach(b =>
+        b.addEventListener('click', () => startExam(Number(b.dataset.n), Number(b.dataset.m))));
+      document.getElementById('examCancel').addEventListener('click', leaveExamToPractice);
+    }
+
+    function startExam(n, minutes) {
+      const ids = shuffle(questions.map(q => q.id)).slice(0, Math.min(n, questions.length));
+      exam = { active: true, ids, answers: {}, idx: 0,
+               endTime: Date.now() + minutes * 60000, durationMin: minutes, submitted: false };
+      examActive = true;
+      saveExam();
+      startTimer();
+      examRender();
+    }
+
+    function examRender() {
+      if (!exam) return;
+      if (exam.submitted) return examResult();
+      examActive = true;
+      $footer.style.display = 'flex';
+      $examSubmitBtn.style.display = 'block';
+
+      const ids = exam.ids;
+      const q = qById[ids[exam.idx]];
+      const answeredCount = ids.filter(id => exam.answers[id] != null).length;
+      $progressText.textContent = `${answeredCount}/${ids.length} 답함`;
+      $progressFill.style.width = `${(answeredCount / ids.length) * 100}%`;
+
+      let html = `
+        <div class="exam-bar">
+          <div>
+            <div class="exam-timer" id="examTimer">--:--</div>
+            <div class="exam-sub">남은 시간</div>
+          </div>
+          <div class="exam-sub" style="text-align:right">
+            ${exam.idx + 1} / ${ids.length} 문항<br>실전 모의고사
+          </div>
+        </div>
+        <div class="omr">`;
+      ids.forEach((id, i) => {
+        let c = '';
+        if (exam.answers[id] != null) c += ' done';
+        if (i === exam.idx) c += ' cur';
+        html += `<button class="${c}" data-j="${i}">${i + 1}</button>`;
+      });
+      html += '</div>';
+
+      const sel = exam.answers[q.id];
+      html += `
+        <div class="meta-row">
+          <span class="tag">${unitName(q.unit)}</span>
+          <span class="tag gray">${q.points}점</span>
+          <span class="tag gray">${q.round}회 ${q.number}번</span>
+        </div>
+        <p class="prompt">${q.prompt}</p>
+        ${q.image ? `<img class="q-image" src="${q.image}" alt="문제 이미지" />` : ''}
+        <ul class="choices">`;
+      q.choices.forEach((c, i) => {
+        const cls = 'choice' + (i === sel ? ' selected' : '');
+        html += `<li><button class="${cls}" data-i="${i}">
+            <span class="num">${'①②③④⑤'[i]}</span><span>${c}</span></button></li>`;
+      });
+      html += '</ul>';
+
+      $content.innerHTML = html;
+      $content.scrollTop = 0;
+      $content.querySelectorAll('.choice').forEach(b =>
+        b.addEventListener('click', () => { exam.answers[q.id] = Number(b.dataset.i); saveExam(); examRender(); }));
+      $content.querySelectorAll('.omr button').forEach(b =>
+        b.addEventListener('click', () => { exam.idx = Number(b.dataset.j); saveExam(); examRender(); }));
+
+      $prevBtn.disabled = exam.idx === 0;
+      $actionBtn.disabled = exam.idx === ids.length - 1;
+      $actionBtn.textContent = '다음';
+      tick();
+    }
+
+    function submitExam() {
+      if (!exam) return;
+      stopTimer();
+      exam.submitted = true;
+      // 풀이 기록을 공용 저장소에 반영 → 오답노트/북마크와 연동
+      exam.ids.forEach(id => {
+        const q = qById[id];
+        const sel = exam.answers[id];
+        if (sel != null) store.answers[id] = { selected: sel, correct: sel === q.answer };
+      });
+      saveExam();
+      examResult();
+    }
+
+    function examResult() {
+      examActive = true;
+      stopTimer();
+      $footer.style.display = 'none';
+      $examSubmitBtn.style.display = 'none';
+      const ids = exam.ids;
+      let got = 0, tot = 0, correctN = 0, answeredN = 0;
+      ids.forEach(id => {
+        const q = qById[id];
+        tot += q.points;
+        const sel = exam.answers[id];
+        if (sel != null) answeredN++;
+        if (sel === q.answer) { got += q.points; correctN++; }
+      });
+      const pct = tot ? Math.round((got / tot) * 100) : 0;
+      let grade, cls;
+      if (pct >= 80) { grade = '예상 1급'; cls = 'pass'; }
+      else if (pct >= 70) { grade = '예상 2급'; cls = 'pass'; }
+      else if (pct >= 60) { grade = '예상 3급'; cls = 'pass'; }
+      else { grade = '불합격 (60점 미만)'; cls = 'fail'; }
+
+      $progressText.textContent = `${answeredN}/${ids.length}`;
+      $progressFill.style.width = '100%';
+      $content.innerHTML = `
+        <div class="result">
+          <h2>채점 결과</h2>
+          <div class="grade big ${cls}">${grade}</div>
+          <div class="score-circle">
+            <div class="score-num">${pct}<span style="font-size:18px">점</span></div>
+            <div class="score-total">배점 ${got} / ${tot}점</div>
+          </div>
+          <div class="result-stats">
+            <div class="stat"><div class="v ok">${correctN}</div><div class="l">맞음</div></div>
+            <div class="stat"><div class="v no">${answeredN - correctN}</div><div class="l">틀림</div></div>
+            <div class="stat"><div class="v">${ids.length - answeredN}</div><div class="l">안 풂</div></div>
+          </div>
+          <div class="result-actions">
+            <button class="btn btn-primary" id="examReviewBtn">문제·해설 다시 보기</button>
+            <button class="btn btn-ghost" id="examNewBtn" style="flex:none">새 모의고사</button>
+            <button class="btn btn-ghost" id="examExitBtn" style="flex:none">학습 모드로 나가기</button>
+          </div>
+          <p class="exam-sub" style="margin-top:16px">심화 기준: 80점↑ 1급 · 70점↑ 2급 · 60점↑ 3급<br>틀린 문제는 ★ 오답노트에도 자동 저장됐어요.</p>
+        </div>`;
+      document.getElementById('examReviewBtn').addEventListener('click', examReview);
+      document.getElementById('examNewBtn').addEventListener('click', openExamStart);
+      document.getElementById('examExitBtn').addEventListener('click', leaveExamToPractice);
+    }
+
+    function examReview() {
+      $footer.style.display = 'none';
+      $examSubmitBtn.style.display = 'none';
+      let html = `<div style="display:flex;gap:8px;margin-bottom:8px">
+          <button class="btn btn-ghost" id="reviewBackBtn" style="flex:1">← 결과로</button>
+        </div>`;
+      exam.ids.forEach((id, n) => {
+        const q = qById[id];
+        const sel = exam.answers[id];
+        const isOk = sel === q.answer;
+        html += `<div class="review-item">
+          <div class="meta-row">
+            <span class="tag gray">${n + 1}번</span>
+            <span class="tag">${unitName(q.unit)}</span>
+            <span class="tag ${isOk ? '' : 'warn'}">${sel == null ? '미응답' : (isOk ? '정답' : '오답')}</span>
+          </div>
+          <p class="prompt">${q.prompt}</p>
+          ${q.image ? `<img class="q-image" src="${q.image}" />` : ''}
+          <ul class="choices">`;
+        q.choices.forEach((c, i) => {
+          let cls = 'choice locked';
+          if (i === q.answer) cls += ' correct';
+          else if (i === sel) cls += ' wrong';
+          html += `<li><button class="${cls}" disabled>
+              <span class="num">${'①②③④⑤'[i]}</span><span>${c}</span></button></li>`;
+        });
+        html += `</ul>
+          <div class="explanation"><div class="explanation-body">${q.explanation || ''}</div></div>
+        </div>`;
+      });
+      $content.innerHTML = html;
+      $content.scrollTop = 0;
+      document.getElementById('reviewBackBtn').addEventListener('click', examResult);
+    }
+
+    // 모의고사를 끝내고 학습 모드로 복귀
+    function leaveExamToPractice() {
+      stopTimer();
+      examActive = false;
+      exam = null;
+      store.exam = null;
+      saveStore();
+      $examSubmitBtn.style.display = 'none';
+      mode = 'quiz';
+      $wrongBtn.classList.remove('active');
+      buildPool(); idx = 0; loadQuestion();
+    }
+
+    // 학습 모드 동작 전, 진행 중 모의고사가 있으면 확인 후 종료
+    function guardExam() {
+      if (examActive && exam && !exam.submitted) {
+        if (!confirm('진행 중인 모의고사를 종료할까요? 기록은 저장되지 않습니다.')) return false;
+      }
+      stopTimer();
+      examActive = false;
+      exam = null;
+      store.exam = null;
+      saveStore();
+      $examSubmitBtn.style.display = 'none';
+      return true;
+    }
+
     // ============================ 이벤트 ============================
     $actionBtn.addEventListener('click', () => {
+      if (examActive) {
+        if (exam.idx < exam.ids.length - 1) { exam.idx++; saveExam(); examRender(); }
+        return;
+      }
       const q = pool[idx];
       if (!checked) {
         checked = true;
@@ -410,27 +694,57 @@
         else { idx++; loadQuestion(); }
       }
     });
-    $prevBtn.addEventListener('click', () => { if (idx > 0) { idx--; loadQuestion(); } });
+    $prevBtn.addEventListener('click', () => {
+      if (examActive) {
+        if (exam.idx > 0) { exam.idx--; saveExam(); examRender(); }
+        return;
+      }
+      if (idx > 0) { idx--; loadQuestion(); }
+    });
+    $examSubmitBtn.addEventListener('click', () => {
+      if (!exam || exam.submitted) return;
+      const answered = exam.ids.filter(id => exam.answers[id] != null).length;
+      const left = exam.ids.length - answered;
+      const msg = left > 0 ? `아직 ${left}문항을 풀지 않았어요. 제출할까요?` : '제출하고 채점할까요?';
+      if (confirm(msg)) submitExam();
+    });
+    $examBtn.addEventListener('click', () => {
+      if (examActive && exam && !exam.submitted) { examRender(); return; }  // 진행 중이면 이어서
+      if (!guardExam()) return;
+      openExamStart();
+    });
 
     $unitSelect.addEventListener('change', e => {
+      if (!guardExam()) { $unitSelect.value = unitCode; return; }
       unitCode = e.target.value;
       if (mode !== 'quiz') { mode = 'quiz'; $wrongBtn.classList.remove('active'); }
       buildPool(); idx = 0; loadQuestion();
     });
     $shuffleBtn.addEventListener('click', () => {
+      if (!guardExam()) return;
       shuffled = !shuffled;
       $shuffleBtn.classList.toggle('active', shuffled);
       buildPool(); idx = 0; loadQuestion();
     });
     $wrongBtn.addEventListener('click', () => {
+      if (!guardExam()) return;
       switchMode(mode === 'wrong' ? 'quiz' : 'wrong');
     });
     document.getElementById('homeBtn').addEventListener('click', () => {
+      if (!guardExam()) return;
       mode = 'quiz'; buildPool(); idx = 0; loadQuestion();
     });
 
     // ============================ 시작 ============================
-    restoreOrStart();
+    if (store.exam && store.exam.active) {
+      exam = store.exam;
+      examActive = true;
+      if (exam.submitted) examResult();
+      else if (exam.endTime > Date.now()) { startTimer(); examRender(); }
+      else submitExam();   // 자리를 비운 사이 시간 종료 → 자동 채점
+    } else {
+      restoreOrStart();
+    }
   </script>
 </body>
 </html>
